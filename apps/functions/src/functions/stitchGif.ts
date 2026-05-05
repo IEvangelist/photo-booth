@@ -7,7 +7,7 @@ interface StitchMessage {
     captureId: string;
 }
 
-const storageConnection = () => required("AzureWebJobsStorage");
+const blobConnection = () => required("ConnectionStrings__blobs");
 const rawContainer = () => process.env.BLOB_RAW_CONTAINER ?? "photoboothraw";
 const shareContainer = () => process.env.BLOB_SHARE_CONTAINER ?? "photoboothshare";
 const frameDelayMs = () => Number.parseInt(process.env.FRAME_DELAY_MS ?? "333", 10);
@@ -27,20 +27,20 @@ app.storageQueue("stitchGif", {
 
         await postStatus({ captureId, state: "stitching" }, context);
 
-        const blobs = BlobServiceClient.fromConnectionString(storageConnection());
-        const raw = blobs.getContainerClient(rawContainer());
-        const share = blobs.getContainerClient(shareContainer());
-
-        // Idempotency: if the share GIF already exists, skip stitch and just postback.
-        const shareBlob = share.getBlockBlobClient(`${captureId}.gif`);
-        if (await shareBlob.exists()) {
-            const shareUrl = shareBlob.url;
-            context.log(`stitchGif: ${captureId} already stitched at ${shareUrl}, skipping`);
-            await postStatus({ captureId, state: "uploaded", shareUrl }, context);
-            return;
-        }
-
         try {
+            const blobs = BlobServiceClient.fromConnectionString(blobConnection());
+            const raw = blobs.getContainerClient(rawContainer());
+            const share = blobs.getContainerClient(shareContainer());
+
+            // Idempotency: if the share GIF already exists, skip stitch and just postback.
+            const shareBlob = share.getBlockBlobClient(`${captureId}.gif`);
+            if (await shareBlob.exists()) {
+                const shareUrl = shareBlob.url;
+                context.log(`stitchGif: ${captureId} already stitched at ${shareUrl}, skipping`);
+                await postStatus({ captureId, state: "uploaded", shareUrl }, context);
+                return;
+            }
+
             // Pull all frames for this capture from the raw container.
             const frames: DecodedFrame[] = [];
             for await (const blob of raw.listBlobsFlat({ prefix: `${captureId}/` })) {
@@ -71,10 +71,11 @@ app.storageQueue("stitchGif", {
                 }
             }
         } catch (err) {
-            const message = (err as Error).message;
-            context.error(`stitchGif: ${captureId} failed`, err);
+            const e = err as { message?: string; code?: string; statusCode?: number };
+            const message = e.message ?? String(err);
+            context.error(`stitchGif: ${captureId} failed (status=${e.statusCode ?? "?"} code=${e.code ?? "?"}): ${message}`);
             await postStatus({ captureId, state: "stitch_failed", error: message }, context);
-            throw err; // Let the queue handle the retry budget (see host.json maxDequeueCount)
+            throw err; // Let the queue handle the retry budget (see host.json maxDequeueCount).
         }
     },
 });
