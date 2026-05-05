@@ -43,6 +43,18 @@ The phone number prompt comes **after** the photos so the subject sees their GIF
 
 See [`AGENTS.md`](./AGENTS.md) for the run commands, conventions, and full status flow.
 
+## The flow
+
+A complete capture, end-to-end against the local Aspire stack (Chromium with a fake webcam — Chromium's built-in moving test pattern — drives the Angular kiosk through Playwright):
+
+| Step | Screen |
+|---|---|
+| **1. Idle.** Booth waits, pulsing the start button. Options (`photosToTake`, `frameDelay`, …) are fetched up front. | ![Idle screen](./docs/screenshots/01-idle.png) |
+| **2. Number pad.** Customer punches in an E.164 phone number; client-side regex unlocks `Take photos`. | ![Number pad](./docs/screenshots/02-number-pad.png) |
+| **3. Camera + countdown.** Mirrored video feed, big yellow countdown overlay, snaps `photosToTake` frames spaced by `frameDelay`. | ![Camera countdown](./docs/screenshots/03-camera-countdown.png) |
+| **4. Preview.** Captured frames cycle so the customer can sanity-check before posting; `Retake` re-runs `/capture`, `Send it!` posts to the API. | ![Preview](./docs/screenshots/04-preview.png) |
+| **5. Share.** Five live status pills (`Received` → `Stitching GIF` → `Uploaded` → `Texting you` → `Sent!`) update over SignalR, with the QR code resolving to the GIF served from Azurite. | ![Share](./docs/screenshots/05-share.png) |
+
 ## Prerequisites
 
 - .NET **10** SDK
