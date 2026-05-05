@@ -162,9 +162,7 @@ export class CameraPage implements AfterViewInit, OnDestroy {
         video.srcObject = this.mediaStream;
         await this.waitForVideoMetadata(video);
 
-        await this.runCountdown(opts.photoCountDownDefault, opts.intervalBetweenCountDown);
-        if (this.aborted) return;
-        await this.captureFrames(opts.photosToTake, opts.frameDelay, opts.imageWidth, opts.imageHeight);
+        await this.runCapture(opts);
         if (this.aborted) return;
 
         this.phase.set('done');
@@ -210,12 +208,10 @@ export class CameraPage implements AfterViewInit, OnDestroy {
         await this.delay(Math.min(intervalMs, 600));
     }
 
-    private async captureFrames(count: number, frameDelayMs: number, width: number, height: number): Promise<void> {
-        this.phase.set('capturing');
-        const frames: string[] = [];
+    private async runCapture(opts: { photosToTake: number; photoCountDownDefault: number; intervalBetweenCountDown: number; imageWidth: number; imageHeight: number }): Promise<void> {
         const canvas = this.canvasRef().nativeElement;
-        canvas.width = width;
-        canvas.height = height;
+        canvas.width = opts.imageWidth;
+        canvas.height = opts.imageHeight;
         const ctx = canvas.getContext('2d');
         const video = this.videoRef().nativeElement;
         if (!ctx) {
@@ -223,21 +219,28 @@ export class CameraPage implements AfterViewInit, OnDestroy {
             return;
         }
 
-        for (let i = 0; i < count; i++) {
+        const frames: string[] = [];
+        for (let i = 0; i < opts.photosToTake; i++) {
+            // Each shot gets its own countdown so the subject can pose between snaps.
+            await this.runCountdown(opts.photoCountDownDefault, opts.intervalBetweenCountDown);
             if (this.aborted) return;
+
+            this.phase.set('capturing');
             // Mirror to match the preview (we flipped the video element with CSS only).
             ctx.save();
-            ctx.translate(width, 0);
+            ctx.translate(opts.imageWidth, 0);
             ctx.scale(-1, 1);
-            ctx.drawImage(video, 0, 0, width, height);
+            ctx.drawImage(video, 0, 0, opts.imageWidth, opts.imageHeight);
             ctx.restore();
 
             this.flash();
-            const dataUrl = canvas.toDataURL('image/png');
-            frames.push(dataUrl);
+            frames.push(canvas.toDataURL('image/png'));
             this.snapped.set(i + 1);
-            if (i < count - 1) {
-                await this.delay(frameDelayMs);
+
+            if (i < opts.photosToTake - 1) {
+                // Brief pause so "Snap!" is visible before the next countdown starts.
+                await this.delay(opts.intervalBetweenCountDown);
+                if (this.aborted) return;
             }
         }
 
