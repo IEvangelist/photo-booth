@@ -27,6 +27,7 @@ const E164 = /^\+\d{8,15}$/;
                 <button type="button" class="ghost" (click)="cancel()">Cancel</button>
                 <button type="button" class="cta-pill" (click)="submit()" [disabled]="!isValid()">Take photos</button>
             </div>
+            <p class="kbd-hint">Tip: keyboard works too — digits, <kbd>+</kbd>, <kbd>Backspace</kbd>, <kbd>Enter</kbd>, <kbd>Esc</kbd>.</p>
         </section>
     `,
     styles: [`
@@ -70,7 +71,23 @@ const E164 = /^\+\d{8,15}$/;
             font-weight: 600;
         }
         .ghost:hover { background: rgba(255, 255, 255, 0.06); }
+        .kbd-hint {
+            color: #6b7388;
+            font-size: 0.85rem;
+            letter-spacing: 0.04em;
+        }
+        kbd {
+            font-family: inherit;
+            font-size: 0.8rem;
+            padding: 0.1rem 0.4rem;
+            border-radius: 0.3rem;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
     `],
+    host: {
+        '(document:keydown)': 'onKeydown($event)'
+    },
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class NumberPadPage {
@@ -109,5 +126,26 @@ export class NumberPadPage {
         if (!this.isValid()) return;
         this.store.setPhone(this.entered());
         void this.router.navigate(['/capture']);
+    }
+
+    protected onKeydown(event: KeyboardEvent): void {
+        // Ignore modified key combos so browser shortcuts (Ctrl+R, Cmd+L, …) still work.
+        if (event.ctrlKey || event.metaKey || event.altKey) return;
+
+        const { key } = event;
+        if (/^[0-9]$/.test(key)) {
+            this.press(key);
+        } else if (key === '+') {
+            this.press('+');
+        } else if (key === 'Backspace') {
+            this.press('⌫');
+        } else if (key === 'Enter') {
+            this.submit();
+        } else if (key === 'Escape') {
+            this.cancel();
+        } else {
+            return; // unhandled — let the event propagate normally
+        }
+        event.preventDefault();
     }
 }
