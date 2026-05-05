@@ -17,6 +17,7 @@ export type IconName =
     | 'share'
     | 'check-circle'
     | 'qr'
+    | 'home'
     | 'twitter'
     | 'facebook'
     | 'whatsapp'
@@ -71,6 +72,11 @@ export type IconName =
                 <rect x="14.5" y="3.5" width="6" height="6" rx="0.5"/>
                 <rect x="3.5" y="14.5" width="6" height="6" rx="0.5"/>
                 <path d="M14.5 14.5h2.5v2.5h-2.5zM18.5 14.5h2v2h-2zM14.5 18.5h2v2h-2zM18.5 18.5h2v2h-2z"/>
+            }
+            @case ('home') {
+                <path d="M3.5 11.2L12 4l8.5 7.2"/>
+                <path d="M5.5 10v9.5h13V10"/>
+                <path d="M10 19.5v-5h4v5"/>
             }
             @case ('twitter') {
                 <path d="M18 5h2.5l-5.5 6.3L21.5 20H17l-3.7-4.6L9 20H6.5l5.9-6.7L6 5h4.6l3.4 4.3z"/>

@@ -90,8 +90,8 @@ const ORDER: Record<string, number> = {
 
             <button type="button" class="cta-pill" (click)="done()" [disabled]="!canFinish()">
                 @if (canFinish()) {
-                    <pb-icon name="check-circle" [size]="22" />
-                    <span>Done</span>
+                    <pb-icon name="home" [size]="22" />
+                    <span>Home</span>
                 } @else {
                     <span>Working…</span>
                 }
@@ -262,9 +262,9 @@ export class SharePage implements OnInit, OnDestroy {
             case 'stitching': return 'Stitching frames into an animated GIF.';
             case 'uploaded': return 'GIF ready. Sending you the link.';
             case 'sending': return 'Texting your phone now.';
-            case 'sent': return 'Tap done to start over.';
+            case 'sent': return 'Tap home to start over.';
             case 'sms_failed': return 'We made the GIF, but couldn\'t text it. Use the QR code.';
-            case 'stitch_failed': return 'Tap done to try again.';
+            case 'stitch_failed': return 'Tap home to try again.';
             default: return '';
         }
     });
