@@ -15,6 +15,11 @@ const internalWebhookSecret = builder.addParameterWithGeneratedValue(
 // SMS provider toggle: log | acs | twilio. Default to log so local dev needs zero credentials.
 const smsProvider = builder.addParameter('sms-provider', { value: 'log' });
 
+// Public origin where the kiosk SPA is reachable. Used by the Functions worker
+// to build the landing-page URL (`{BOOTH_PUBLIC_URL}/g/{captureId}`) that gets
+// texted to the recipient and rendered as the QR code on the kiosk.
+const boothPublicUrl = builder.addParameter('booth-public-url', { value: 'http://localhost:4200' });
+
 // First-class Azure Storage resource backed by an Azurite container in dev.
 // Pinning the standard emulator ports keeps `UseDevelopmentStorage=true` viable
 // for tools (like the Functions host) that expect them.
@@ -61,13 +66,21 @@ await builder
     .waitFor(tables)
     .waitFor(api)
     .withHttpEndpoint({ port: 7071, targetPort: 7071, name: 'http', isProxied: false })
+    .withOtlpExporter()
     .withEnvironment('FUNCTIONS_WORKER_RUNTIME', 'node')
     // Functions host needs blobs+queues+tables internally; the standard
     // emulator string resolves to the pinned ports above.
     .withEnvironment('AzureWebJobsStorage', 'UseDevelopmentStorage=true')
     .withEnvironment('API_BASE_URL', api.getEndpoint('http'))
+    .withEnvironment('BOOTH_PUBLIC_URL', boothPublicUrl)
     .withEnvironment('INTERNAL_WEBHOOK_SECRET', internalWebhookSecret)
     .withEnvironment('SMS_PROVIDER', smsProvider)
+    .withEnvironment('OTEL_SERVICE_NAME', 'photo-booth-functions')
+    .withEnvironment('OTEL_RESOURCE_ATTRIBUTES', 'service.name=photo-booth-functions,service.namespace=photo-booth')
+    // Aspire's local OTLP collector runs with a self-signed dev cert. Best-
+    // effort bypass for the Node TLS stack (grpc-js doesn't honor it, so
+    // local-dashboard delivery is not guaranteed in dev — see tracing.ts).
+    .withEnvironment('NODE_TLS_REJECT_UNAUTHORIZED', '0')
     .withEnvironment('AzureFunctionsJobHost__logging__console__isEnabled', 'true');
 
 await builder

@@ -35,12 +35,44 @@ public sealed class CaptureRepository(
         {
             var response = await Table.GetEntityAsync<CaptureEntity>("captures", captureId, cancellationToken: ct);
             var e = response.Value;
-            return new CaptureStatusResponse(e.RowKey, e.State, e.ShareUrl, e.Error, e.CreatedAt, e.UpdatedAt);
+            return new CaptureStatusResponse(e.RowKey, e.State, e.ShareUrl, e.ThumbnailUrl, e.LandingUrl, e.Error, e.CreatedAt, e.UpdatedAt);
         }
         catch (RequestFailedException ex) when (ex.Status == 404)
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// Returns the most recent successfully-stitched captures (uploaded or sent), newest first,
+    /// for the kiosk's idle gallery carousel. Capped at <paramref name="limit"/> items.
+    /// </summary>
+    public async Task<IReadOnlyList<GalleryItem>> GetRecentSentAsync(int limit, CancellationToken ct = default)
+    {
+        if (limit <= 0) return Array.Empty<GalleryItem>();
+
+        var items = new List<CaptureEntity>(capacity: limit);
+        var filter = $"PartitionKey eq 'captures' and ShareUrl ne ''";
+        await foreach (var page in Table.QueryAsync<CaptureEntity>(filter, cancellationToken: ct).AsPages())
+        {
+            foreach (var entity in page.Values)
+            {
+                if (string.IsNullOrEmpty(entity.ShareUrl)) continue;
+                if (entity.State == CaptureStates.StitchFailed) continue;
+                items.Add(entity);
+            }
+        }
+
+        return items
+            .OrderByDescending(e => e.UpdatedAt)
+            .Take(limit)
+            .Select(e => new GalleryItem(
+                e.RowKey,
+                e.ShareUrl ?? string.Empty,
+                e.ThumbnailUrl,
+                e.LandingUrl ?? string.Empty,
+                e.CreatedAt))
+            .ToList();
     }
 
     /// <summary>

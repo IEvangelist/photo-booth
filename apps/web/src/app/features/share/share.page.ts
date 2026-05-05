@@ -13,6 +13,7 @@ import { Router } from '@angular/router';
 import QRCode from 'qrcode';
 
 import { CaptureState } from '../../core/api/booth-api.types';
+import { IconComponent } from '../../core/icons/icon.component';
 import { StatusService } from '../../core/signalr/status.service';
 import { BoothStore } from '../../core/state/booth.store';
 
@@ -41,6 +42,8 @@ const ORDER: Record<string, number> = {
 
 @Component({
     selector: 'pb-share',
+    standalone: true,
+    imports: [IconComponent],
     template: `
         <section class="kiosk-shell share">
             <h1 class="kiosk-title small">{{ headline() }}</h1>
@@ -52,16 +55,29 @@ const ORDER: Record<string, number> = {
                         [class.active]="orderOf(currentState()) >= orderOf(step.state)"
                         [class.failed]="isFailed() && step.state === lastReachedStep()"
                     >
-                        <span class="dot"></span>
+                        @if (orderOf(currentState()) >= orderOf(step.state)) {
+                            <pb-icon name="check-circle" [size]="14" />
+                        } @else {
+                            <span class="dot"></span>
+                        }
                         <span>{{ step.label }}</span>
                     </li>
                 }
             </ol>
 
-            @if (shareUrl(); as url) {
-                <div class="share-card">
-                    <canvas #qrCanvas width="220" height="220"></canvas>
-                    <a class="share-link" [href]="url" target="_blank" rel="noopener">{{ url }}</a>
+            @if (gifUrl(); as gif) {
+                <div class="result">
+                    <img class="gif-preview" [src]="gif" alt="your photo booth GIF" />
+                    @if (qrTarget(); as target) {
+                        <div class="qr-card">
+                            <canvas #qrCanvas width="180" height="180"></canvas>
+                            <p class="qr-label">
+                                <pb-icon name="qr" [size]="14" />
+                                <span>Scan to open</span>
+                            </p>
+                            <a class="share-link" [href]="target" target="_blank" rel="noopener">{{ target }}</a>
+                        </div>
+                    }
                     @if (smsFailed()) {
                         <p class="hint warn">Text didn't go through. Scan the QR code instead.</p>
                     }
@@ -73,7 +89,12 @@ const ORDER: Record<string, number> = {
             }
 
             <button type="button" class="cta-pill" (click)="done()" [disabled]="!canFinish()">
-                {{ canFinish() ? 'Done' : 'Working…' }}
+                @if (canFinish()) {
+                    <pb-icon name="home" [size]="22" />
+                    <span>Home</span>
+                } @else {
+                    <span>Working…</span>
+                }
             </button>
         </section>
     `,
@@ -85,15 +106,15 @@ const ORDER: Record<string, number> = {
             padding: 0;
             margin: 0;
             display: flex;
-            gap: 1.4rem;
+            gap: 0.75rem;
             flex-wrap: wrap;
             justify-content: center;
         }
         .timeline li {
-            display: flex;
+            display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem 1rem;
+            gap: 0.4rem;
+            padding: 0.4rem 0.85rem;
             border-radius: 9999px;
             background: rgba(255, 255, 255, 0.04);
             color: #6b7388;
@@ -109,40 +130,68 @@ const ORDER: Record<string, number> = {
             background: rgba(239, 71, 111, 0.18);
         }
         .dot {
-            width: 0.6rem;
-            height: 0.6rem;
+            width: 0.5rem;
+            height: 0.5rem;
             background: currentColor;
             border-radius: 50%;
             display: inline-block;
         }
-        .share-card {
+        .result {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .gif-preview {
+            width: clamp(14rem, 28vw, 22rem);
+            aspect-ratio: 4 / 3;
+            object-fit: cover;
+            border-radius: 1rem;
+            box-shadow: 0 30px 60px -20px rgba(0,0,0,0.7);
+        }
+        .qr-card {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 0.75rem;
-            padding: 1.5rem;
+            gap: 0.5rem;
+            padding: 1rem 1.25rem;
             background: rgba(255, 255, 255, 0.04);
             border-radius: 1.25rem;
-            max-width: 28rem;
+            max-width: 18rem;
         }
-        .share-card canvas {
+        .qr-card canvas {
             background: white;
-            border-radius: 0.75rem;
-            padding: 0.5rem;
+            border-radius: 0.5rem;
+            padding: 0.4rem;
+        }
+        .qr-label {
+            margin: 0;
+            color: #b6becf;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
         }
         .share-link {
             font-family: monospace;
-            font-size: 0.95rem;
-            color: #f5f7fa;
+            font-size: 0.75rem;
+            color: #b6becf;
             word-break: break-all;
             text-align: center;
             text-decoration: underline;
+            line-height: 1.2;
         }
         .hint {
             margin: 0;
             color: #6b7388;
+            flex-basis: 100%;
+            text-align: center;
         }
         .hint.warn { color: #ffd166; }
+        .cta-pill { display: inline-flex; align-items: center; gap: 0.5rem; }
     `],
     changeDetection: ChangeDetectionStrategy.OnPush
 })
@@ -160,8 +209,18 @@ export class SharePage implements OnInit, OnDestroy {
         return s ?? 'queued';
     });
 
-    protected readonly shareUrl = computed<string | null>(
+    // Raw GIF blob URL — what we render inline as the preview image.
+    protected readonly gifUrl = computed<string | null>(
         () => this.status.latest()?.shareUrl ?? this.store.status()?.shareUrl ?? null
+    );
+
+    // Kiosk-hosted landing page URL — what we encode in the QR and surface as
+    // the canonical share link. Falls back to the raw GIF URL when the AppHost
+    // hasn't been configured with a public booth URL.
+    protected readonly qrTarget = computed<string | null>(
+        () => this.status.latest()?.landingUrl
+              ?? this.store.status()?.landingUrl
+              ?? this.gifUrl()
     );
 
     protected readonly errorText = computed<string | null>(() => {
@@ -203,19 +262,19 @@ export class SharePage implements OnInit, OnDestroy {
             case 'stitching': return 'Stitching frames into an animated GIF.';
             case 'uploaded': return 'GIF ready. Sending you the link.';
             case 'sending': return 'Texting your phone now.';
-            case 'sent': return 'Tap done to start over.';
+            case 'sent': return 'Tap home to start over.';
             case 'sms_failed': return 'We made the GIF, but couldn\'t text it. Use the QR code.';
-            case 'stitch_failed': return 'Tap done to try again.';
+            case 'stitch_failed': return 'Tap home to try again.';
             default: return '';
         }
     });
 
     constructor() {
         afterRenderEffect(() => {
-            const url = this.shareUrl();
+            const url = this.qrTarget();
             const canvas = this.qrCanvas()?.nativeElement;
             if (url && canvas) {
-                void QRCode.toCanvas(canvas, url, { width: 220, margin: 1 });
+                void QRCode.toCanvas(canvas, url, { width: 180, margin: 1 });
             }
         });
     }

@@ -21,5 +21,12 @@ export const routes: Routes = [
         path: 'share',
         loadComponent: () => import('./features/share/share.page').then(m => m.SharePage)
     },
+    {
+        // Public landing page for an individual capture, linked from the
+        // outgoing SMS and the kiosk's QR code. Recipients open this URL on
+        // their phone to view the GIF and use the share buttons.
+        path: 'g/:captureId',
+        loadComponent: () => import('./features/landing/landing.page').then(m => m.LandingPage)
+    },
     { path: '**', redirectTo: '' }
 ];

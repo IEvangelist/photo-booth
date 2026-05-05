@@ -45,6 +45,13 @@ public static partial class CaptureEndpoints
             return snapshot is null ? Results.NotFound() : Results.Ok(snapshot);
         });
 
+        app.MapGet("/api/gallery", async (int? limit, CaptureRepository repo, CancellationToken ct) =>
+        {
+            var capped = Math.Clamp(limit ?? 12, 1, 48);
+            var items = await repo.GetRecentSentAsync(capped, ct);
+            return Results.Ok(new GalleryResponse(items));
+        });
+
         return app;
     }
 

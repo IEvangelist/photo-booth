@@ -16,6 +16,8 @@ public sealed record CaptureStatusResponse(
     string CaptureId,
     string State,
     string? ShareUrl,
+    string? ThumbnailUrl,
+    string? LandingUrl,
     string? Error,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
@@ -24,12 +26,23 @@ public sealed record InternalStatusUpdate(
     string CaptureId,
     string State,
     string? ShareUrl,
+    string? ThumbnailUrl,
+    string? LandingUrl,
     string? Error,
     string? ProviderMessageId);
 
 public sealed record StitchQueueMessage(string CaptureId);
 
-public sealed record SmsQueueMessage(string CaptureId, string Phone, string ShareUrl);
+public sealed record SmsQueueMessage(string CaptureId, string Phone, string ShareUrl, string LandingUrl);
+
+public sealed record GalleryItem(
+    string CaptureId,
+    string ShareUrl,
+    string? ThumbnailUrl,
+    string LandingUrl,
+    DateTimeOffset CreatedAt);
+
+public sealed record GalleryResponse(IReadOnlyList<GalleryItem> Items);
 
 public static class CaptureStates
 {

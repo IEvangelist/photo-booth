@@ -7,7 +7,8 @@ import {
     BoothOptionsDto,
     CaptureStatusDto,
     CreateCaptureRequest,
-    CreateCaptureResponse
+    CreateCaptureResponse,
+    GalleryResponseDto
 } from './booth-api.types';
 
 @Injectable({ providedIn: 'root' })
@@ -25,5 +26,9 @@ export class BoothApiService {
 
     getStatus(captureId: string): Observable<CaptureStatusDto> {
         return this.http.get<CaptureStatusDto>(`${this.base}/api/captures/${captureId}/status`);
+    }
+
+    getGallery(limit = 12): Observable<GalleryResponseDto> {
+        return this.http.get<GalleryResponseDto>(`${this.base}/api/gallery?limit=${limit}`);
     }
 }

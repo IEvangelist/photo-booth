@@ -1,6 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 
+import { BoothApiService } from '../../core/api/booth-api.service';
+import { IconComponent } from '../../core/icons/icon.component';
 import { BoothStore } from '../../core/state/booth.store';
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '0', '⌫'] as const;
@@ -8,10 +11,12 @@ const E164 = /^\+\d{8,15}$/;
 
 @Component({
     selector: 'pb-number-pad',
+    standalone: true,
+    imports: [IconComponent],
     template: `
         <section class="kiosk-shell pad">
-            <h1 class="kiosk-title small">Your phone number</h1>
-            <p class="kiosk-subtitle">We'll text you the link to your GIF.</p>
+            <h1 class="kiosk-title small">Where should we send it?</h1>
+            <p class="kiosk-subtitle">Drop in your phone number and we'll text you a link to your GIF.</p>
 
             <div class="display" [class.invalid]="!isValid() && entered().length > 0">
                 <span>{{ display() }}</span>
@@ -19,13 +24,27 @@ const E164 = /^\+\d{8,15}$/;
 
             <div class="grid">
                 @for (key of keys; track key) {
-                    <button type="button" class="key" (click)="press(key)">{{ key }}</button>
+                    <button type="button" class="key" (click)="press(key)" [disabled]="sending()">{{ key }}</button>
                 }
             </div>
 
+            @if (error()) {
+                <p class="banner-error">{{ error() }}</p>
+            }
+
             <div class="actions">
-                <button type="button" class="ghost" (click)="cancel()">Cancel</button>
-                <button type="button" class="cta-pill" (click)="submit()" [disabled]="!isValid()">Take photos</button>
+                <button type="button" class="ghost" (click)="cancel()" [disabled]="sending()">
+                    <pb-icon name="refresh" [size]="18" />
+                    <span>Start over</span>
+                </button>
+                <button type="button" class="cta-pill" (click)="submit()" [disabled]="!isValid() || sending()">
+                    @if (sending()) {
+                        <span>Sending…</span>
+                    } @else {
+                        <pb-icon name="message-square" [size]="22" />
+                        <span>Text me my GIF</span>
+                    }
+                </button>
             </div>
             <p class="kbd-hint">Tip: keyboard works too — digits, <kbd>+</kbd>, <kbd>Backspace</kbd>, <kbd>Enter</kbd>, <kbd>Esc</kbd>.</p>
         </section>
@@ -61,16 +80,24 @@ const E164 = /^\+\d{8,15}$/;
             background: rgba(255, 255, 255, 0.06);
             transition: background 0.1s ease, transform 0.1s ease;
         }
-        .key:hover { background: rgba(255, 255, 255, 0.1); }
-        .key:active { transform: scale(0.95); background: rgba(255, 255, 255, 0.18); }
-        .actions { display: flex; gap: 1rem; }
+        .key:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); }
+        .key:active:not(:disabled) { transform: scale(0.95); background: rgba(255, 255, 255, 0.18); }
+        .key:disabled { opacity: 0.5; cursor: not-allowed; }
+        .actions { display: flex; gap: 1rem; align-items: center; }
+        .actions .cta-pill,
+        .actions .ghost {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
         .ghost {
             padding: 1rem 2rem;
             border-radius: 9999px;
             color: #b6becf;
             font-weight: 600;
         }
-        .ghost:hover { background: rgba(255, 255, 255, 0.06); }
+        .ghost:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); }
+        .ghost:disabled { opacity: 0.5; cursor: not-allowed; }
         .kbd-hint {
             color: #6b7388;
             font-size: 0.85rem;
@@ -93,14 +120,19 @@ const E164 = /^\+\d{8,15}$/;
 export class NumberPadPage {
     private readonly store = inject(BoothStore);
     private readonly router = inject(Router);
+    private readonly api = inject(BoothApiService);
+    private readonly destroyRef = inject(DestroyRef);
 
     protected readonly keys = KEYS;
     protected readonly entered = signal<string>(this.store.phoneNumber() || '+1');
+    protected readonly sending = signal(false);
+    protected readonly error = signal<string | null>(null);
 
     protected readonly display = computed(() => this.entered() || '+');
     protected readonly isValid = computed(() => E164.test(this.entered()));
 
     press(key: string): void {
+        if (this.sending()) return;
         const current = this.entered();
         if (key === '⌫') {
             this.entered.set(current.length > 0 ? current.slice(0, -1) : '');
@@ -118,14 +150,40 @@ export class NumberPadPage {
     }
 
     cancel(): void {
+        if (this.sending()) return;
         this.store.reset();
         void this.router.navigate(['/']);
     }
 
     submit(): void {
-        if (!this.isValid()) return;
-        this.store.setPhone(this.entered());
-        void this.router.navigate(['/capture']);
+        if (!this.isValid() || this.sending()) return;
+
+        const phone = this.entered();
+        const frames = this.store.frames();
+        if (!frames.length) {
+            // Customer landed on /phone without any captured frames — bounce back to start.
+            this.error.set('No photos in this session. Please start over.');
+            return;
+        }
+
+        this.store.setPhone(phone);
+        this.sending.set(true);
+        this.error.set(null);
+
+        this.api.createCapture({ phone, frames })
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({
+                next: response => {
+                    this.store.setCapture(response.captureId);
+                    this.sending.set(false);
+                    void this.router.navigate(['/share']);
+                },
+                error: err => {
+                    this.sending.set(false);
+                    const message = err?.error?.error ?? 'The booth could not accept your photos. Try again.';
+                    this.error.set(message);
+                }
+            });
     }
 
     protected onKeydown(event: KeyboardEvent): void {

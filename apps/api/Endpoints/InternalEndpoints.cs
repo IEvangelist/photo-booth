@@ -41,6 +41,8 @@ public static class InternalEndpoints
                     e =>
                     {
                         if (!string.IsNullOrEmpty(update.ShareUrl)) e.ShareUrl = update.ShareUrl;
+                        if (!string.IsNullOrEmpty(update.ThumbnailUrl)) e.ThumbnailUrl = update.ThumbnailUrl;
+                        if (!string.IsNullOrEmpty(update.LandingUrl)) e.LandingUrl = update.LandingUrl;
                         if (!string.IsNullOrEmpty(update.Error)) e.Error = update.Error;
                         if (!string.IsNullOrEmpty(update.ProviderMessageId)) e.ProviderMessageId = update.ProviderMessageId;
 
@@ -59,12 +61,18 @@ public static class InternalEndpoints
                     && entity.SmsSentAt is null)
                 {
                     var smsQueue = queues.GetQueueClient(opts.Value.SmsQueue);
-                    var msg = JsonSerializer.Serialize(new SmsQueueMessage(entity.RowKey, entity.Phone, entity.ShareUrl), QueueJson);
+                    var msg = JsonSerializer.Serialize(
+                        new SmsQueueMessage(
+                            entity.RowKey,
+                            entity.Phone,
+                            entity.ShareUrl ?? string.Empty,
+                            entity.LandingUrl ?? entity.ShareUrl ?? string.Empty),
+                        QueueJson);
                     await smsQueue.SendMessageAsync(Convert.ToBase64String(Encoding.UTF8.GetBytes(msg)), ct);
                 }
 
                 var snapshot = new CaptureStatusResponse(
-                    entity.RowKey, entity.State, entity.ShareUrl, entity.Error, entity.CreatedAt, entity.UpdatedAt);
+                    entity.RowKey, entity.State, entity.ShareUrl, entity.ThumbnailUrl, entity.LandingUrl, entity.Error, entity.CreatedAt, entity.UpdatedAt);
                 await hub.Clients.Group(entity.RowKey).SendAsync("status", snapshot, ct);
 
                 logger.LogInformation("Capture {CaptureId} → {State}", entity.RowKey, entity.State);
