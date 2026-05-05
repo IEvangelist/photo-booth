@@ -106,9 +106,14 @@ type Phase = 'priming' | 'countdown' | 'capturing' | 'done' | 'error';
             background: white;
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.12s ease;
+            /* Smooth fade-out only — when .active is added we cut to full opacity
+               instantly so the flash actually lights the subject *before* capture. */
+            transition: opacity 0.22s ease-out;
         }
-        .flash.active { opacity: 0.85; }
+        .flash.active {
+            opacity: 1;
+            transition: none;
+        }
         @keyframes pop {
             0% { transform: scale(1.6); opacity: 0; }
             30% { transform: scale(1); opacity: 1; }
@@ -226,6 +231,16 @@ export class CameraPage implements AfterViewInit, OnDestroy {
             if (this.aborted) return;
 
             this.phase.set('capturing');
+
+            // Light the subject with the white overlay BEFORE sampling the camera
+            // so the captured frame actually carries the extra illumination.
+            // We wait two animation frames (so the overlay is on the screen) plus
+            // a small delay so the webcam's next frame and auto-exposure can
+            // register the brighter scene before drawImage samples it.
+            this.flashing.set(true);
+            await this.waitForFlashIllumination();
+            if (this.aborted) return;
+
             // Mirror to match the preview (we flipped the video element with CSS only).
             ctx.save();
             ctx.translate(opts.imageWidth, 0);
@@ -233,9 +248,12 @@ export class CameraPage implements AfterViewInit, OnDestroy {
             ctx.drawImage(video, 0, 0, opts.imageWidth, opts.imageHeight);
             ctx.restore();
 
-            this.flash();
             frames.push(canvas.toDataURL('image/png'));
             this.snapped.set(i + 1);
+
+            // Hold the flash a beat longer for that satisfying snap feel, then drop it.
+            await this.delay(160);
+            this.flashing.set(false);
 
             if (i < opts.photosToTake - 1) {
                 // Brief pause so "Snap!" is visible before the next countdown starts.
@@ -247,10 +265,21 @@ export class CameraPage implements AfterViewInit, OnDestroy {
         this.store.setFrames(frames);
     }
 
-    private flash(): void {
-        this.flashing.set(true);
-        const handle = setTimeout(() => this.flashing.set(false), 130);
-        this.timeoutHandles.push(handle);
+    /**
+     * Wait until the white flash overlay is on-screen AND the webcam has had
+     * time to push a frame that reflects the new illumination. Two RAFs ensure
+     * the browser has painted the overlay; the trailing delay gives the camera
+     * sensor (~30fps + AE response) time to register the brighter scene.
+     */
+    private waitForFlashIllumination(): Promise<void> {
+        return new Promise<void>(resolve => {
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    const handle = setTimeout(() => resolve(), 140);
+                    this.timeoutHandles.push(handle);
+                });
+            });
+        });
     }
 
     private delay(ms: number): Promise<void> {
