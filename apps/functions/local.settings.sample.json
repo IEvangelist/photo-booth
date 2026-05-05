@@ -1,0 +1,25 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "FUNCTIONS_EXTENSION_VERSION": "~4",
+
+    "API_BASE_URL": "http://localhost:5000",
+    "INTERNAL_WEBHOOK_SECRET": "dev-shared-secret-change-me",
+
+    "BLOB_RAW_CONTAINER": "photoboothraw",
+    "BLOB_SHARE_CONTAINER": "photoboothshare",
+    "QUEUE_STITCH": "stitch-requests",
+    "QUEUE_SMS": "sms-requests",
+
+    "FRAME_DELAY_MS": "333",
+
+    "SMS_PROVIDER": "log",
+    "ACS_CONNECTION_STRING": "",
+    "ACS_FROM_PHONE": "",
+    "TWILIO_ACCOUNT_SID": "",
+    "TWILIO_AUTH_TOKEN": "",
+    "TWILIO_FROM_PHONE": ""
+  }
+}

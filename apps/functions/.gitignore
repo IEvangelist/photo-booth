@@ -1,0 +1,15 @@
+bin
+obj
+csx
+.vs
+edge
+Publish
+*.user
+*.suo
+*.cscfg
+*.Cache
+project.lock.json
+local.settings.json
+.azure
+node_modules
+dist

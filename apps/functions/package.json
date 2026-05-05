@@ -1,0 +1,34 @@
+{
+  "name": "photobooth-functions",
+  "version": "1.0.0",
+  "description": "Azure Functions (Node TS v4) for stitching GIFs and dispatching SMS share links.",
+  "private": true,
+  "type": "module",
+  "main": "dist/src/index.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "clean": "rimraf dist",
+    "prestart": "npm run build",
+    "start": "func start --port 7071",
+    "test": "echo \"no tests yet\""
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@azure/communication-sms": "^1.2.0-beta.4",
+    "@azure/functions": "^4.14.0",
+    "@azure/storage-blob": "^12.31.0",
+    "gifenc": "^1.0.3",
+    "pngjs": "^7.0.0",
+    "twilio": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.10",
+    "@types/pngjs": "^6.0.5",
+    "azure-functions-core-tools": "^4.10.0",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.7.3"
+  }
+}

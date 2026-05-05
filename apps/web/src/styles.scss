@@ -1,0 +1,101 @@
+@use 'sass:color';
+
+:root {
+    color-scheme: dark;
+    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    background: #050608;
+    color: #f5f7fa;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+app-root {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+}
+
+button {
+    font: inherit;
+    color: inherit;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+}
+
+button:focus-visible {
+    outline: 2px solid #f5f7fa;
+    outline-offset: 4px;
+}
+
+.kiosk-shell {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: radial-gradient(ellipse at top, #161a25 0%, #050608 70%);
+    padding: clamp(1rem, 4vw, 4rem);
+    gap: clamp(1rem, 3vw, 3rem);
+}
+
+.kiosk-title {
+    font-size: clamp(2rem, 6vw, 4.5rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0;
+    text-transform: uppercase;
+    background: linear-gradient(120deg, #ffd166, #ef476f, #06d6a0);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.kiosk-subtitle {
+    font-size: clamp(1.1rem, 2vw, 1.6rem);
+    color: #b6becf;
+    margin: 0;
+}
+
+.cta-pill {
+    padding: 1.4rem 4rem;
+    border-radius: 9999px;
+    font-size: clamp(1.4rem, 2.4vw, 2rem);
+    font-weight: 700;
+    background: linear-gradient(120deg, #ef476f, #ffd166);
+    color: #15101e;
+    box-shadow: 0 18px 50px -10px rgba(239, 71, 111, 0.45);
+    transition: transform 0.15s ease;
+}
+
+.cta-pill:hover { transform: scale(1.03); }
+.cta-pill:active { transform: scale(0.97); }
+.cta-pill:disabled {
+    background: #2a3040;
+    color: #5b667a;
+    box-shadow: none;
+    cursor: not-allowed;
+}
+
+.banner-error {
+    background: rgba(239, 71, 111, 0.15);
+    border: 1px solid rgba(239, 71, 111, 0.45);
+    color: #ffb3c0;
+    padding: 0.85rem 1.4rem;
+    border-radius: 0.75rem;
+    max-width: 36rem;
+}
