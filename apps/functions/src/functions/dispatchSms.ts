@@ -6,6 +6,7 @@ interface SmsMessage {
     captureId: string;
     phone: string;
     shareUrl: string;
+    landingUrl?: string;
 }
 
 app.storageQueue("dispatchSms", {
@@ -18,13 +19,18 @@ app.storageQueue("dispatchSms", {
             return;
         }
 
-        const { captureId, phone, shareUrl } = message;
-        context.log(`dispatchSms: ${captureId} → ${phone}`);
+        const { captureId, phone, shareUrl, landingUrl } = message;
+        // Prefer the kiosk-hosted landing page (with share buttons) over the
+        // raw blob URL when texting the recipient — but always fall back to
+        // shareUrl so that a missing BOOTH_PUBLIC_URL still yields a working text.
+        const linkToShare = landingUrl && landingUrl.length > 0 ? landingUrl : shareUrl;
+
+        context.log(`dispatchSms: ${captureId} → ${phone} (link=${linkToShare})`);
 
         await postStatus({ captureId, state: "sending" }, context);
 
         const provider = await getSmsProvider();
-        const body = `Your photo booth GIF is ready! ${shareUrl}`;
+        const body = `Your photo booth GIF is ready! ${linkToShare}`;
 
         const result = await provider.send(phone, body, context);
 
@@ -33,6 +39,7 @@ app.storageQueue("dispatchSms", {
                 captureId,
                 state: "sent",
                 shareUrl,
+                landingUrl,
                 providerMessageId: result.providerMessageId,
             }, context);
         } else {
@@ -43,6 +50,7 @@ app.storageQueue("dispatchSms", {
                 captureId,
                 state: "sms_failed",
                 shareUrl,
+                landingUrl,
                 error: result.error ?? "SMS send failed",
             }, context);
         }

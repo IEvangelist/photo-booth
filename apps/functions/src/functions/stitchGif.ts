@@ -11,6 +11,11 @@ const blobConnection = () => required("ConnectionStrings__blobs");
 const rawContainer = () => process.env.BLOB_RAW_CONTAINER ?? "photoboothraw";
 const shareContainer = () => process.env.BLOB_SHARE_CONTAINER ?? "photoboothshare";
 const frameDelayMs = () => Number.parseInt(process.env.FRAME_DELAY_MS ?? "333", 10);
+const publicBaseUrl = () => (process.env.BOOTH_PUBLIC_URL ?? "").replace(/\/$/, "");
+const landingUrlFor = (captureId: string): string | undefined => {
+    const base = publicBaseUrl();
+    return base ? `${base}/g/${captureId}` : undefined;
+};
 
 app.storageQueue("stitchGif", {
     connection: "AzureWebJobsStorage",
@@ -37,7 +42,7 @@ app.storageQueue("stitchGif", {
             if (await shareBlob.exists()) {
                 const shareUrl = shareBlob.url;
                 context.log(`stitchGif: ${captureId} already stitched at ${shareUrl}, skipping`);
-                await postStatus({ captureId, state: "uploaded", shareUrl }, context);
+                await postStatus({ captureId, state: "uploaded", shareUrl, landingUrl: landingUrlFor(captureId) }, context);
                 return;
             }
 
@@ -60,7 +65,7 @@ app.storageQueue("stitchGif", {
 
             const shareUrl = shareBlob.url;
             context.log(`stitchGif: uploaded ${shareUrl}`);
-            await postStatus({ captureId, state: "uploaded", shareUrl }, context);
+            await postStatus({ captureId, state: "uploaded", shareUrl, landingUrl: landingUrlFor(captureId) }, context);
 
             // Best-effort cleanup of raw frames now that the share GIF is durable.
             for await (const blob of raw.listBlobsFlat({ prefix: `${captureId}/` })) {

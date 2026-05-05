@@ -1,43 +1,44 @@
 import {
     ChangeDetectionStrategy,
     Component,
-    DestroyRef,
     OnDestroy,
     OnInit,
     computed,
-    effect,
     inject,
     signal
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 
-import { BoothApiService } from '../../core/api/booth-api.service';
+import { IconComponent } from '../../core/icons/icon.component';
 import { BoothStore } from '../../core/state/booth.store';
 
 @Component({
     selector: 'pb-preview',
+    standalone: true,
+    imports: [IconComponent],
     template: `
         <section class="kiosk-shell preview">
             <h1 class="kiosk-title small">Looking good?</h1>
             @if (currentFrame(); as frame) {
                 <div class="frame-wrapper">
                     <img class="frame" [src]="frame" alt="captured frame" />
-                    <span class="badge">Preview</span>
+                    <span class="badge">
+                        <pb-icon name="film" [size]="14" />
+                        <span>Preview</span>
+                    </span>
                 </div>
             } @else {
                 <p class="kiosk-subtitle">No frames captured.</p>
             }
-            @if (sending()) {
-                <p class="kiosk-subtitle">Sending to the booth…</p>
-            } @else if (error()) {
-                <p class="banner-error">{{ error() }}</p>
-            }
 
             <div class="actions">
-                <button type="button" class="ghost" (click)="retry()" [disabled]="sending()">Retake</button>
-                <button type="button" class="cta-pill" (click)="send()" [disabled]="sending() || !hasFrames()">
-                    {{ sending() ? 'Sending…' : 'Send it!' }}
+                <button type="button" class="ghost" (click)="retry()">
+                    <pb-icon name="refresh" [size]="20" />
+                    <span>Retake</span>
+                </button>
+                <button type="button" class="cta-pill" (click)="continue()" [disabled]="!hasFrames()">
+                    <span>Looks good — text it</span>
+                    <pb-icon name="arrow-right" [size]="22" />
                 </button>
             </div>
         </section>
@@ -63,15 +64,24 @@ import { BoothStore } from '../../core/state/booth.store';
             position: absolute;
             top: 0.75rem;
             left: 0.75rem;
-            padding: 0.25rem 0.75rem;
-            background: rgba(0, 0, 0, 0.5);
+            padding: 0.3rem 0.75rem;
+            background: rgba(0, 0, 0, 0.55);
             border-radius: 9999px;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             text-transform: uppercase;
-            letter-spacing: 0.1em;
+            letter-spacing: 0.12em;
             color: #f5f7fa;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
         }
-        .actions { display: flex; gap: 1rem; }
+        .actions { display: flex; gap: 1rem; align-items: center; }
+        .actions .cta-pill,
+        .actions .ghost {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
         .ghost {
             padding: 1rem 2rem;
             border-radius: 9999px;
@@ -85,12 +95,8 @@ import { BoothStore } from '../../core/state/booth.store';
 })
 export class PreviewPage implements OnInit, OnDestroy {
     private readonly store = inject(BoothStore);
-    private readonly api = inject(BoothApiService);
     private readonly router = inject(Router);
-    private readonly destroyRef = inject(DestroyRef);
 
-    protected readonly sending = signal(false);
-    protected readonly error = signal<string | null>(null);
     protected readonly frameIndex = signal<number>(0);
     protected readonly hasFrames = computed(() => this.store.frames().length > 0);
     protected readonly currentFrame = computed(() => this.store.frames()[this.frameIndex()] ?? null);
@@ -114,36 +120,14 @@ export class PreviewPage implements OnInit, OnDestroy {
     }
 
     retry(): void {
-        if (this.sending()) return;
         this.store.setFrames([]);
         void this.router.navigate(['/capture']);
     }
 
-    send(): void {
-        if (this.sending() || !this.hasFrames()) return;
-        const phone = this.store.phoneNumber();
-        const frames = this.store.frames();
-        if (!phone || !frames.length) {
-            this.error.set('Missing phone or frames.');
-            return;
-        }
-
-        this.sending.set(true);
-        this.error.set(null);
-        this.api
-            .createCapture({ phone, frames })
-            .pipe(takeUntilDestroyed(this.destroyRef))
-            .subscribe({
-                next: response => {
-                    this.store.setCapture(response.captureId);
-                    this.sending.set(false);
-                    void this.router.navigate(['/share']);
-                },
-                error: err => {
-                    this.sending.set(false);
-                    const message = err?.error?.error ?? 'The booth could not accept your photos. Try again.';
-                    this.error.set(message);
-                }
-            });
+    continue(): void {
+        if (!this.hasFrames()) return;
+        // Phone collection happens AFTER the photos are taken so the customer
+        // has already approved their shots before being asked for any PII.
+        void this.router.navigate(['/phone']);
     }
 }
