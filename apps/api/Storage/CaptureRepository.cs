@@ -35,7 +35,7 @@ public sealed class CaptureRepository(
         {
             var response = await Table.GetEntityAsync<CaptureEntity>("captures", captureId, cancellationToken: ct);
             var e = response.Value;
-            return new CaptureStatusResponse(e.RowKey, e.State, e.ShareUrl, e.LandingUrl, e.Error, e.CreatedAt, e.UpdatedAt);
+            return new CaptureStatusResponse(e.RowKey, e.State, e.ShareUrl, e.ThumbnailUrl, e.LandingUrl, e.Error, e.CreatedAt, e.UpdatedAt);
         }
         catch (RequestFailedException ex) when (ex.Status == 404)
         {
@@ -69,6 +69,7 @@ public sealed class CaptureRepository(
             .Select(e => new GalleryItem(
                 e.RowKey,
                 e.ShareUrl ?? string.Empty,
+                e.ThumbnailUrl,
                 e.LandingUrl ?? string.Empty,
                 e.CreatedAt))
             .ToList();

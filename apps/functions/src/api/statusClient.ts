@@ -13,6 +13,7 @@ export interface StatusUpdate {
     captureId: string;
     state: CaptureState;
     shareUrl?: string;
+    thumbnailUrl?: string;
     landingUrl?: string;
     error?: string;
     providerMessageId?: string;

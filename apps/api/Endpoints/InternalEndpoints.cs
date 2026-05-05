@@ -41,6 +41,7 @@ public static class InternalEndpoints
                     e =>
                     {
                         if (!string.IsNullOrEmpty(update.ShareUrl)) e.ShareUrl = update.ShareUrl;
+                        if (!string.IsNullOrEmpty(update.ThumbnailUrl)) e.ThumbnailUrl = update.ThumbnailUrl;
                         if (!string.IsNullOrEmpty(update.LandingUrl)) e.LandingUrl = update.LandingUrl;
                         if (!string.IsNullOrEmpty(update.Error)) e.Error = update.Error;
                         if (!string.IsNullOrEmpty(update.ProviderMessageId)) e.ProviderMessageId = update.ProviderMessageId;
@@ -71,7 +72,7 @@ public static class InternalEndpoints
                 }
 
                 var snapshot = new CaptureStatusResponse(
-                    entity.RowKey, entity.State, entity.ShareUrl, entity.LandingUrl, entity.Error, entity.CreatedAt, entity.UpdatedAt);
+                    entity.RowKey, entity.State, entity.ShareUrl, entity.ThumbnailUrl, entity.LandingUrl, entity.Error, entity.CreatedAt, entity.UpdatedAt);
                 await hub.Clients.Group(entity.RowKey).SendAsync("status", snapshot, ct);
 
                 logger.LogInformation("Capture {CaptureId} → {State}", entity.RowKey, entity.State);

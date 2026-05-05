@@ -29,6 +29,7 @@ export interface CaptureStatusDto {
     captureId: string;
     state: CaptureState;
     shareUrl?: string | null;
+    thumbnailUrl?: string | null;
     landingUrl?: string | null;
     error?: string | null;
     createdAt?: string | null;
@@ -38,6 +39,7 @@ export interface CaptureStatusDto {
 export interface GalleryItemDto {
     captureId: string;
     shareUrl: string;
+    thumbnailUrl?: string | null;
     landingUrl: string;
     createdAt: string;
 }

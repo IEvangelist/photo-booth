@@ -14,6 +14,7 @@ public sealed class CaptureEntity : ITableEntity
     public string Phone { get; set; } = string.Empty;
     public int FrameCount { get; set; }
     public string? ShareUrl { get; set; }
+    public string? ThumbnailUrl { get; set; }
     public string? LandingUrl { get; set; }
     public string? Error { get; set; }
     public string? ProviderMessageId { get; set; }

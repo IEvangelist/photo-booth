@@ -1,6 +1,6 @@
 import { app, InvocationContext } from "@azure/functions";
 import { BlobServiceClient } from "@azure/storage-blob";
-import { decodePng, encodeAnimatedGif, DecodedFrame } from "../gif/encoder.js";
+import { decodePng, encodePng, encodeAnimatedGif, DecodedFrame } from "../gif/encoder.js";
 import { postStatus } from "../api/statusClient.js";
 
 interface StitchMessage {
@@ -39,10 +39,18 @@ app.storageQueue("stitchGif", {
 
             // Idempotency: if the share GIF already exists, skip stitch and just postback.
             const shareBlob = share.getBlockBlobClient(`${captureId}.gif`);
+            const thumbBlob = share.getBlockBlobClient(`${captureId}-thumb.png`);
             if (await shareBlob.exists()) {
                 const shareUrl = shareBlob.url;
+                const thumbnailUrl = (await thumbBlob.exists()) ? thumbBlob.url : undefined;
                 context.log(`stitchGif: ${captureId} already stitched at ${shareUrl}, skipping`);
-                await postStatus({ captureId, state: "uploaded", shareUrl, landingUrl: landingUrlFor(captureId) }, context);
+                await postStatus({
+                    captureId,
+                    state: "uploaded",
+                    shareUrl,
+                    thumbnailUrl,
+                    landingUrl: landingUrlFor(captureId),
+                }, context);
                 return;
             }
 
@@ -63,9 +71,29 @@ app.storageQueue("stitchGif", {
                 blobHTTPHeaders: { blobContentType: "image/gif" },
             });
 
+            // Static thumbnail = first frame as a PNG. The idle-screen gallery
+            // shows these (instead of the animated GIFs) so a rotating carousel
+            // of captures isn't a strobe risk.
+            let thumbnailUrl: string | undefined;
+            try {
+                const thumbBytes = encodePng(frames[0]);
+                await thumbBlob.uploadData(thumbBytes, {
+                    blobHTTPHeaders: { blobContentType: "image/png" },
+                });
+                thumbnailUrl = thumbBlob.url;
+            } catch (thumbErr) {
+                context.warn(`stitchGif: thumbnail upload failed for ${captureId}`, thumbErr);
+            }
+
             const shareUrl = shareBlob.url;
             context.log(`stitchGif: uploaded ${shareUrl}`);
-            await postStatus({ captureId, state: "uploaded", shareUrl, landingUrl: landingUrlFor(captureId) }, context);
+            await postStatus({
+                captureId,
+                state: "uploaded",
+                shareUrl,
+                thumbnailUrl,
+                landingUrl: landingUrlFor(captureId),
+            }, context);
 
             // Best-effort cleanup of raw frames now that the share GIF is durable.
             for await (const blob of raw.listBlobsFlat({ prefix: `${captureId}/` })) {

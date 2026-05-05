@@ -16,6 +16,7 @@ public sealed record CaptureStatusResponse(
     string CaptureId,
     string State,
     string? ShareUrl,
+    string? ThumbnailUrl,
     string? LandingUrl,
     string? Error,
     DateTimeOffset CreatedAt,
@@ -25,6 +26,7 @@ public sealed record InternalStatusUpdate(
     string CaptureId,
     string State,
     string? ShareUrl,
+    string? ThumbnailUrl,
     string? LandingUrl,
     string? Error,
     string? ProviderMessageId);
@@ -36,6 +38,7 @@ public sealed record SmsQueueMessage(string CaptureId, string Phone, string Shar
 public sealed record GalleryItem(
     string CaptureId,
     string ShareUrl,
+    string? ThumbnailUrl,
     string LandingUrl,
     DateTimeOffset CreatedAt);
 
