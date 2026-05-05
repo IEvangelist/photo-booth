@@ -15,14 +15,17 @@ builder.Services.AddOptions<BoothOptions>()
 
 builder.Services.AddSingleton(sp => sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<BoothOptions>>().Value);
 
-// ── Storage clients (Azurite-backed via env) ───────────────────────────────
-var storageConn = builder.Configuration["AzureWebJobsStorage"]
-                  ?? builder.Configuration.GetConnectionString("Storage")
-                  ?? "UseDevelopmentStorage=true";
+// ── Storage clients (Aspire-injected connection strings, one per service) ──
+var blobsConn = builder.Configuration.GetConnectionString("blobs")
+                ?? throw new InvalidOperationException("ConnectionStrings:blobs is required (wired by Aspire AppHost).");
+var queuesConn = builder.Configuration.GetConnectionString("queues")
+                 ?? throw new InvalidOperationException("ConnectionStrings:queues is required (wired by Aspire AppHost).");
+var tablesConn = builder.Configuration.GetConnectionString("tables")
+                 ?? throw new InvalidOperationException("ConnectionStrings:tables is required (wired by Aspire AppHost).");
 
-builder.Services.AddSingleton(_ => new BlobServiceClient(storageConn));
-builder.Services.AddSingleton(_ => new QueueServiceClient(storageConn));
-builder.Services.AddSingleton(_ => new TableServiceClient(storageConn));
+builder.Services.AddSingleton(_ => new BlobServiceClient(blobsConn));
+builder.Services.AddSingleton(_ => new QueueServiceClient(queuesConn));
+builder.Services.AddSingleton(_ => new TableServiceClient(tablesConn));
 builder.Services.AddSingleton<CaptureRepository>();
 builder.Services.AddSingleton<ICaptureSnapshotProvider>(sp => sp.GetRequiredService<CaptureRepository>());
 builder.Services.AddHostedService<StorageBootstrapper>();

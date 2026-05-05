@@ -15,61 +15,66 @@ const internalWebhookSecret = builder.addParameterWithGeneratedValue(
 // SMS provider toggle: log | acs | twilio. Default to log so local dev needs zero credentials.
 const smsProvider = builder.addParameter('sms-provider', { value: 'log' });
 
-// Azurite (Blob + Queue + Table) on the well-known dev-storage ports so
-// `UseDevelopmentStorage=true` "just works" for both the .NET API and Node Functions.
-const azurite = builder
-    .addContainer('azurite', { image: 'mcr.microsoft.com/azure-storage/azurite', tag: 'latest' })
-    .withHttpEndpoint({ port: 10000, targetPort: 10000, name: 'blob', isProxied: false })
-    .withHttpEndpoint({ port: 10001, targetPort: 10001, name: 'queue', isProxied: false })
-    .withHttpEndpoint({ port: 10002, targetPort: 10002, name: 'table', isProxied: false })
-    .withVolume('/data', { name: 'photo-booth-azurite-data' })
-    .withArgs([
-        'azurite',
-        '--blobHost', '0.0.0.0',
-        '--queueHost', '0.0.0.0',
-        '--tableHost', '0.0.0.0',
-        '--location', '/data',
-        '--skipApiVersionCheck'
-    ]);
+// First-class Azure Storage resource backed by an Azurite container in dev.
+// Pinning the standard emulator ports keeps `UseDevelopmentStorage=true` viable
+// for tools (like the Functions host) that expect them.
+// `--skipApiVersionCheck` lets the JS storage SDK's default service version
+// (currently `2026-02-06`) through Azurite 3.35.0, which otherwise rejects it
+// with `InvalidHeaderValue`. (`withApiVersionCheck({enable:false})` is a no-op
+// at the container-arg level in Aspire 13.3.0, so we add the flag explicitly.)
+const storage = builder
+    .addAzureStorage('storage')
+    .runAsEmulator({
+        configureContainer: async c => {
+            await c
+                .withImageTag('latest')
+                .withBlobPort(10000)
+                .withQueuePort(10001)
+                .withTablePort(10002)
+                .withDataVolume({ name: 'photo-booth-azurite-data' })
+                .withArgs(['--skipApiVersionCheck']);
+        },
+    });
 
-const azuriteConnectionString = 'UseDevelopmentStorage=true';
+const blobs = storage.addBlobs('blobs');
+const queues = storage.addQueues('queues');
+const tables = storage.addTables('tables');
 
 const api = builder
     .addProject('api', 'apps/api/PhotoBooth.Api.csproj')
-    .waitFor(azurite)
-    .withEnvironment('AzureWebJobsStorage', azuriteConnectionString)
-    .withEnvironment('ConnectionStrings__Storage', azuriteConnectionString)
+    .withReference(blobs)
+    .withReference(queues)
+    .withReference(tables)
+    .waitFor(blobs)
+    .waitFor(queues)
+    .waitFor(tables)
     .withEnvironment('INTERNAL_WEBHOOK_SECRET', internalWebhookSecret);
 
-const functions = builder
-    .addExecutable(
-        'functions',
-        'npx',
-        'apps/functions',
-        ['--yes', 'func', 'start', '--port', '7071', '--no-build']
-    )
-    .waitFor(azurite)
+await builder
+    .addExecutable('functions', 'npx', 'apps/functions',
+        ['--yes', 'func', 'start', '--port', '7071', '--no-build'])
+    .withReference(blobs)
+    .withReference(queues)
+    .withReference(tables)
+    .waitFor(blobs)
+    .waitFor(queues)
+    .waitFor(tables)
     .waitFor(api)
     .withHttpEndpoint({ port: 7071, targetPort: 7071, name: 'http', isProxied: false })
-    .withEnvironment('AzureWebJobsStorage', azuriteConnectionString)
     .withEnvironment('FUNCTIONS_WORKER_RUNTIME', 'node')
+    // Functions host needs blobs+queues+tables internally; the standard
+    // emulator string resolves to the pinned ports above.
+    .withEnvironment('AzureWebJobsStorage', 'UseDevelopmentStorage=true')
     .withEnvironment('API_BASE_URL', api.getEndpoint('http'))
     .withEnvironment('INTERNAL_WEBHOOK_SECRET', internalWebhookSecret)
     .withEnvironment('SMS_PROVIDER', smsProvider)
     .withEnvironment('AzureFunctionsJobHost__logging__console__isEnabled', 'true');
 
-const web = builder
-    .addExecutable(
-        'web',
-        'npm',
-        'apps/web',
-        ['start', '--', '--host', '0.0.0.0', '--port', '4200']
-    )
+await builder
+    .addExecutable('web', 'npm', 'apps/web',
+        ['start', '--', '--host', '0.0.0.0', '--port', '4200'])
     .waitFor(api)
     .withHttpEndpoint({ port: 4200, targetPort: 4200, name: 'ui', isProxied: false })
     .withEnvironment('API_URL', api.getEndpoint('http'));
-
-void functions;
-void web;
 
 await builder.build().run();

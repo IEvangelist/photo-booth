@@ -15,5 +15,8 @@
         "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22131"
       }
     }
+  },
+  "packages": {
+    "Aspire.Hosting.Azure.Storage": "13.3.0"
   }
 }
